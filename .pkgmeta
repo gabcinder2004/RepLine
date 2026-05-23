@@ -1,0 +1,7 @@
+package-as: RepLine
+
+ignore:
+  - .github
+  - .gitignore
+  - .pkgmeta
+  - screenshots

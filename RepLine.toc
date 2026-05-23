@@ -6,6 +6,7 @@
 ## SavedVariables: RepLineDB
 ## SavedVariablesPerCharacter: RepLineCharDB
 ## DefaultState: enabled
+## X-Curse-Project-ID: 1550997
 
 core.lua
 ui.lua

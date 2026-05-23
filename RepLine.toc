@@ -1,0 +1,11 @@
+## Interface: 20505
+## Title: RepLine
+## Notes: Track multiple reputations in a single side panel.
+## Version: 0.1.0
+## Author: gab
+## SavedVariables: RepLineDB
+## SavedVariablesPerCharacter: RepLineCharDB
+## DefaultState: enabled
+
+core.lua
+ui.lua

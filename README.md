@@ -18,6 +18,14 @@ Tick the ones you care about. They appear in the panel immediately. Untick to re
 
 Each bar shows the faction name, your current standing, the numbers, and a progress bar. As you gain rep, the bar fills in smoothly and the accent strip on the left pulses briefly so your eye catches it.
 
+### Panel controls
+
+Three small icons sit in the top-right corner of the panel:
+
+- **≡** — open the options window (sort order, hide in combat)
+- **–** — toggle compact mode
+- **✕** — hide the panel. It stays hidden until you bring it back with `/rep` (or `/rep show`).
+
 ### Compact mode
 
 If your watchlist gets long, click the small `–` icon in the top-right of the panel to switch to compact mode. Each bar collapses to a single thin row with a tier letter on the left (F for Friendly, H for Honored, R for Revered, E for Exalted), the name, and a percent.
@@ -43,12 +51,26 @@ So if you glance over and see a row of turquoise bars and one suddenly shows up 
 
 Click-and-drag anywhere on the panel to move it. The position is saved across all your characters. If you ever lose track of where you put it, type `/rep reset` and it'll snap back to the right edge.
 
+### Options
+
+Click the **≡** icon (or type `/rep options`) to open the options window:
+
+- **Hide in combat** — when ticked, the panel disappears the moment you enter combat and comes back when you leave it. If you've manually hidden the panel with **✕**, it stays hidden.
+- **Sort order** — choose how the bars are ordered:
+  - *Watchlist order* — the order you added them (default)
+  - *Name (A–Z)* — alphabetical
+  - *Reputation (high → low)* — most reputation first, so your Exalted factions float to the top
+  - *Reputation (low → high)* — least reputation first
+
+Both settings are remembered across `/reload`s. Sort order is shared across all your characters; the watchlist itself stays per-character.
+
 ## Slash commands
 
 | Command | What it does |
 |---|---|
 | `/rep` | Show or hide the panel |
 | `/rep edit` | Open the watchlist picker (same as right-clicking the panel) |
+| `/rep options` | Open the options window (sort order, hide in combat) |
 | `/rep compact` | Switch between compact and expanded views |
 | `/rep reset` | Move the panel back to the default position |
 | `/rep show` / `/rep hide` | Force the panel visible or hidden |

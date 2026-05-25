@@ -5,6 +5,7 @@ RL.UI = UI
 local PANEL_WIDTH      = 260
 local PANEL_PAD_X      = 14
 local PANEL_PAD_Y      = 10
+local HEADER_H         = 16
 local BAR_HEIGHT       = 34
 local BAR_GAP          = 6
 local COMPACT_BAR_HEIGHT = 18
@@ -279,6 +280,63 @@ local function SavePosition()
     RepLineDB.y = y
 end
 
+-- Control icons ------------------------------------------------------------
+
+local CONTROL_DIM    = { 0.84, 0.82, 0.78, 0.4 }
+local CONTROL_BRIGHT = { 1, 1, 1, 1 }
+
+-- 12x12 clickable icon for the top control row. `draw(btn)` builds the glyph
+-- textures and returns a recolor function used for the dim<->bright hover.
+local function CreateIconButton(parent, onClick, draw)
+    local btn = CreateFrame("Frame", nil, parent)
+    btn:SetSize(12, 12)
+    btn:SetFrameLevel(parent:GetFrameLevel() + 10)
+    btn:EnableMouse(true)
+    local setColor = draw(btn)
+    setColor(unpack(CONTROL_DIM))
+    btn:SetScript("OnEnter", function() setColor(unpack(CONTROL_BRIGHT)) end)
+    btn:SetScript("OnLeave", function() setColor(unpack(CONTROL_DIM)) end)
+    btn:SetScript("OnMouseUp", function(_, button)
+        if button == "LeftButton" then onClick() end
+    end)
+    return btn
+end
+
+local function DrawCompactGlyph(btn)
+    local line = btn:CreateTexture(nil, "OVERLAY")
+    line:SetSize(7, 1)
+    line:SetPoint("CENTER")
+    return function(r, g, b, a) line:SetColorTexture(r, g, b, a) end
+end
+
+local function DrawCloseGlyph(btn)
+    local x1 = btn:CreateTexture(nil, "OVERLAY")
+    x1:SetSize(10, 1)
+    x1:SetPoint("CENTER")
+    x1:SetRotation(math.rad(45))
+    local x2 = btn:CreateTexture(nil, "OVERLAY")
+    x2:SetSize(10, 1)
+    x2:SetPoint("CENTER")
+    x2:SetRotation(math.rad(-45))
+    return function(r, g, b, a)
+        x1:SetColorTexture(r, g, b, a)
+        x2:SetColorTexture(r, g, b, a)
+    end
+end
+
+local function DrawOptionsGlyph(btn)
+    local lines = {}
+    for i = 1, 3 do
+        local t = btn:CreateTexture(nil, "OVERLAY")
+        t:SetSize(8, 1)
+        t:SetPoint("CENTER", btn, "CENTER", 0, (i - 2) * 3)  -- +3, 0, -3
+        lines[i] = t
+    end
+    return function(r, g, b, a)
+        for _, t in ipairs(lines) do t:SetColorTexture(r, g, b, a) end
+    end
+end
+
 function UI:Build()
     if panel then return end
 
@@ -323,21 +381,21 @@ function UI:Build()
     end)
     panel:SetScript("OnUpdate", PanelOnUpdate)
 
-    local minBtn = CreateFrame("Frame", nil, panel)
-    minBtn:SetSize(12, 12)
-    minBtn:SetPoint("TOPRIGHT", -4, -4)
-    minBtn:SetFrameLevel(panel:GetFrameLevel() + 10)
-    minBtn:EnableMouse(true)
-    local line = minBtn:CreateTexture(nil, "OVERLAY")
-    line:SetSize(7, 1)
-    line:SetPoint("CENTER")
-    line:SetColorTexture(0.84, 0.82, 0.78, 0.4)
-    minBtn:SetScript("OnEnter", function() line:SetColorTexture(1, 1, 1, 1) end)
-    minBtn:SetScript("OnLeave", function() line:SetColorTexture(0.84, 0.82, 0.78, 0.4) end)
-    minBtn:SetScript("OnMouseUp", function(_, button)
-        if button == "LeftButton" then UI:ToggleCompact() end
-    end)
-    panel.minBtn = minBtn
+    -- Top-right control row: options (menu) | compact | close
+    local closeBtn = CreateIconButton(panel, function() UI:Hide() end, DrawCloseGlyph)
+    closeBtn:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -6, -3)
+
+    local compactBtn = CreateIconButton(panel, function() UI:ToggleCompact() end, DrawCompactGlyph)
+    compactBtn:SetPoint("RIGHT", closeBtn, "LEFT", -8, 0)
+
+    local optionsBtn = CreateIconButton(panel, function() UI:ToggleOptions() end, DrawOptionsGlyph)
+    optionsBtn:SetPoint("RIGHT", compactBtn, "LEFT", -8, 0)
+
+    panel.closeBtn = closeBtn
+    panel.compactBtn = compactBtn
+    panel.optionsBtn = optionsBtn
+
+    UI.inCombat = InCombatLockdown() and true or false
 
     for i = 1, RL.MAX_BARS do
         bars[i] = CreateBar(panel, i)
@@ -354,7 +412,7 @@ function UI:Refresh(changedSet)
     if not panel then return end
     changedSet = changedSet or {}
 
-    local watched = RL:GetWatchedList()
+    local watched = RL:GetOrderedWatched()
     local compact = RepLineDB.compact and true or false
     local barHeight = compact and COMPACT_BAR_HEIGHT or BAR_HEIGHT
     local barGap = compact and COMPACT_BAR_GAP or BAR_GAP
@@ -375,7 +433,7 @@ function UI:Refresh(changedSet)
         local data = RL:GetFactionData(factionID)
         SetBarData(bar, data, maxFillWidth)
         bar:ClearAllPoints()
-        local yOffset = -PANEL_PAD_Y - (i - 1) * (barHeight + barGap)
+        local yOffset = -HEADER_H - (i - 1) * (barHeight + barGap)
         bar:SetPoint("TOPLEFT", panel, "TOPLEFT", PANEL_PAD_X, yOffset)
         bar:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -PANEL_PAD_X, yOffset)
         bar:Show()
@@ -394,7 +452,7 @@ function UI:Refresh(changedSet)
         panelHeight = 56
         panel.hint:Show()
     else
-        panelHeight = PANEL_PAD_Y * 2 + count * barHeight + (count - 1) * barGap
+        panelHeight = HEADER_H + PANEL_PAD_Y + count * barHeight + (count - 1) * barGap
         panel.hint:Hide()
     end
     panel:SetHeight(panelHeight)
@@ -414,18 +472,45 @@ function UI:Toggle()
         panel:Show()
         RepLineDB.hidden = false
     end
+    self.combatHidden = false
 end
 
 function UI:Show()
     if not panel then return end
     panel:Show()
     RepLineDB.hidden = false
+    self.combatHidden = false
 end
 
 function UI:Hide()
     if not panel then return end
     panel:Hide()
     RepLineDB.hidden = true
+    self.combatHidden = false
+end
+
+-- Combat auto-hide ----------------------------------------------------------
+
+function UI:OnCombat(entering)
+    self.inCombat = entering and true or false
+    self:ApplyCombatState()
+end
+
+-- Hides the panel for the duration of combat when "hide in combat" is on,
+-- without disturbing the manual hidden state. An explicit /rep show or the
+-- ✕ button (which clear combatHidden) takes precedence for the current fight.
+function UI:ApplyCombatState()
+    if not panel then return end
+    if RepLineDB.hidden then return end  -- manual hide takes precedence
+    if RepLineDB.hideInCombat and self.inCombat then
+        if panel:IsShown() then
+            panel:Hide()
+            self.combatHidden = true
+        end
+    elseif self.combatHidden then
+        panel:Show()
+        self.combatHidden = false
+    end
 end
 
 function UI:ResetPosition()
@@ -628,5 +713,174 @@ function UI:ToggleEdit()
     else
         PopulateEditRows()
         editFrame:Show()
+    end
+end
+
+-- Options -------------------------------------------------------------------
+
+local OPT_WIDTH  = 300
+local OPT_HEIGHT = 210
+local OPT_ROW_H  = 24
+local optionsFrame
+local sortRows = {}
+
+local SORT_MODES = {
+    { key = "manual",   label = "Watchlist order" },
+    { key = "name",     label = "Name (A-Z)" },
+    { key = "rep_desc", label = "Reputation (high to low)" },
+    { key = "rep_asc",  label = "Reputation (low to high)" },
+}
+
+-- Small square indicator reused for the checkbox and the sort selection.
+local function MakeCheckBox(parent)
+    local box = CreateFrame("Frame", nil, parent)
+    box:SetSize(12, 12)
+    box.bg = box:CreateTexture(nil, "ARTWORK")
+    box.bg:SetAllPoints()
+    box.bg:SetColorTexture(1, 1, 1, 0.10)
+    box.fill = box:CreateTexture(nil, "OVERLAY")
+    box.fill:SetPoint("TOPLEFT", 2, -2)
+    box.fill:SetPoint("BOTTOMRIGHT", -2, 2)
+    box.fill:SetColorTexture(0.84, 0.82, 0.78, 1)
+    box.fill:Hide()
+    return box
+end
+
+local function MakeOptionRow(parent, yTop)
+    local row = CreateFrame("Frame", nil, parent)
+    row:SetPoint("TOPLEFT", 16, yTop)
+    row:SetPoint("TOPRIGHT", -16, yTop)
+    row:SetHeight(OPT_ROW_H)
+    row:EnableMouse(true)
+    row.hover = row:CreateTexture(nil, "BACKGROUND")
+    row.hover:SetAllPoints()
+    row.hover:SetColorTexture(1, 1, 1, 0.05)
+    row.hover:Hide()
+    row.label = row:CreateFontString(nil, "OVERLAY")
+    row.label:SetFont(STANDARD_TEXT_FONT, 11, "OUTLINE")
+    row.label:SetTextColor(unpack(C_NAME))
+    row.label:SetJustifyH("LEFT")
+    row:SetScript("OnEnter", function(self) self.hover:Show() end)
+    row:SetScript("OnLeave", function(self) self.hover:Hide() end)
+    return row
+end
+
+local function BuildOptionsFrame()
+    optionsFrame = CreateFrame("Frame", "RepLineOptionsFrame", UIParent)
+    optionsFrame:SetSize(OPT_WIDTH, OPT_HEIGHT)
+    optionsFrame:SetPoint("CENTER")
+    optionsFrame:SetFrameStrata("DIALOG")
+    optionsFrame:EnableMouse(true)
+    optionsFrame:SetMovable(true)
+    optionsFrame:RegisterForDrag("LeftButton")
+    optionsFrame:SetScript("OnDragStart", function(self) self:StartMoving() end)
+    optionsFrame:SetScript("OnDragStop", function(self) self:StopMovingOrSizing() end)
+    optionsFrame:Hide()
+
+    optionsFrame.bg = optionsFrame:CreateTexture(nil, "BACKGROUND")
+    optionsFrame.bg:SetAllPoints()
+    optionsFrame.bg:SetColorTexture(unpack(C_PANEL_BG))
+
+    optionsFrame.topLine = optionsFrame:CreateTexture(nil, "BORDER")
+    optionsFrame.topLine:SetHeight(1)
+    optionsFrame.topLine:SetPoint("TOPLEFT", 0, 0)
+    optionsFrame.topLine:SetPoint("TOPRIGHT", 0, 0)
+    optionsFrame.topLine:SetColorTexture(unpack(C_HAIRLINE))
+
+    optionsFrame.bottomLine = optionsFrame:CreateTexture(nil, "BORDER")
+    optionsFrame.bottomLine:SetHeight(1)
+    optionsFrame.bottomLine:SetPoint("BOTTOMLEFT", 0, 0)
+    optionsFrame.bottomLine:SetPoint("BOTTOMRIGHT", 0, 0)
+    optionsFrame.bottomLine:SetColorTexture(unpack(C_HAIRLINE))
+
+    optionsFrame.title = optionsFrame:CreateFontString(nil, "OVERLAY")
+    optionsFrame.title:SetFont(STANDARD_TEXT_FONT, 12, "OUTLINE")
+    optionsFrame.title:SetTextColor(unpack(C_NAME))
+    optionsFrame.title:SetPoint("TOPLEFT", 16, -14)
+    optionsFrame.title:SetText("OPTIONS")
+
+    local close = CreateFrame("Frame", nil, optionsFrame)
+    close:SetSize(14, 14)
+    close:SetPoint("TOPRIGHT", -14, -14)
+    close:EnableMouse(true)
+    local cx1 = close:CreateTexture(nil, "ARTWORK")
+    cx1:SetSize(14, 1)
+    cx1:SetPoint("CENTER")
+    cx1:SetColorTexture(0.84, 0.82, 0.78, 0.8)
+    cx1:SetRotation(math.rad(45))
+    local cx2 = close:CreateTexture(nil, "ARTWORK")
+    cx2:SetSize(14, 1)
+    cx2:SetPoint("CENTER")
+    cx2:SetColorTexture(0.84, 0.82, 0.78, 0.8)
+    cx2:SetRotation(math.rad(-45))
+    close:SetScript("OnMouseUp", function() optionsFrame:Hide() end)
+    close:SetScript("OnEnter", function()
+        cx1:SetColorTexture(1, 1, 1, 1); cx2:SetColorTexture(1, 1, 1, 1)
+    end)
+    close:SetScript("OnLeave", function()
+        cx1:SetColorTexture(0.84, 0.82, 0.78, 0.8)
+        cx2:SetColorTexture(0.84, 0.82, 0.78, 0.8)
+    end)
+
+    -- Hide in combat (checkbox row)
+    local hic = MakeOptionRow(optionsFrame, -44)
+    hic.label:SetPoint("LEFT", 4, 0)
+    hic.label:SetText("Hide in combat")
+    hic.box = MakeCheckBox(hic)
+    hic.box:SetPoint("RIGHT", -4, 0)
+    hic:SetScript("OnMouseUp", function(self)
+        RepLineDB.hideInCombat = not RepLineDB.hideInCombat
+        if RepLineDB.hideInCombat then self.box.fill:Show() else self.box.fill:Hide() end
+        UI:ApplyCombatState()
+    end)
+    -- preserve the hover handlers from MakeOptionRow
+    optionsFrame.hideInCombat = hic
+
+    -- Sort section
+    optionsFrame.sortHeader = optionsFrame:CreateFontString(nil, "OVERLAY")
+    optionsFrame.sortHeader:SetFont(STANDARD_TEXT_FONT, 10, "OUTLINE")
+    optionsFrame.sortHeader:SetTextColor(unpack(C_DETAIL))
+    optionsFrame.sortHeader:SetPoint("TOPLEFT", 16, -44 - OPT_ROW_H - 10)
+    optionsFrame.sortHeader:SetText("SORT ORDER")
+
+    local sortTop = -44 - OPT_ROW_H - 10 - 16
+    for i, mode in ipairs(SORT_MODES) do
+        local row = MakeOptionRow(optionsFrame, sortTop - (i - 1) * OPT_ROW_H)
+        row.dot = MakeCheckBox(row)
+        row.dot:SetPoint("LEFT", 4, 0)
+        row.label:SetPoint("LEFT", row.dot, "RIGHT", 10, 0)
+        row.label:SetText(mode.label)
+        row.modeKey = mode.key
+        row:SetScript("OnMouseUp", function(self)
+            RepLineDB.sort = self.modeKey
+            for _, r in ipairs(sortRows) do
+                if r.modeKey == RepLineDB.sort then r.dot.fill:Show() else r.dot.fill:Hide() end
+            end
+            UI:Refresh({})
+        end)
+        sortRows[i] = row
+    end
+end
+
+local function PopulateOptions()
+    if RepLineDB.hideInCombat then
+        optionsFrame.hideInCombat.box.fill:Show()
+    else
+        optionsFrame.hideInCombat.box.fill:Hide()
+    end
+    local current = RepLineDB.sort or "manual"
+    for _, r in ipairs(sortRows) do
+        if r.modeKey == current then r.dot.fill:Show() else r.dot.fill:Hide() end
+    end
+end
+
+function UI:ToggleOptions()
+    if not optionsFrame then BuildOptionsFrame() end
+    if optionsFrame:IsShown() then
+        optionsFrame:Hide()
+    else
+        PopulateOptions()
+        optionsFrame:Show()
+        if UIFrameFadeIn then UIFrameFadeIn(optionsFrame, 0.12, 0, 1) end
     end
 end
